@@ -281,7 +281,6 @@ x64_vm_init(void)
     //    - pages itself -- kernel RW, user NONE
     // Your code goes here:
     //TODO: write here for lab#2 exercise#1
-
     //////////////////////////////////////////////////////////////////////
     // Use the physical memory that 'bootstack' refers to as the kernel
     // stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -294,7 +293,6 @@ x64_vm_init(void)
     //     Permissions: kernel RW, user NONE
     // Your code goes here:
     //TODO: write here for lab#2 exercise#1
-
     //////////////////////////////////////////////////////////////////////
     // Map all of physical memory at KERNBASE. We have detected the number
     // of physical pages to be npages.
@@ -304,6 +302,7 @@ x64_vm_init(void)
     // Your code goes here: 
     //TODO: write here for lab#2 exercise#5
     // Check that the initial page directory has been set up correctly.
+
     check_page_free_list(1);
     check_page_alloc();
     page_check();
@@ -370,7 +369,7 @@ page_init(void)
     }
     // 3. mark [IOPHYSMEM, EXTPHYSMEM) as in use
     // starts: npages_basemem, ends: by using boot_alloc(0) so it returns first address for extended memory
-    size_t end = (size_t)(((uint64_t)boot_alloc(0)) / PGSIZE);
+    size_t end = (size_t)(((uint64_t)(PADDR(boot_alloc(0)))) / PGSIZE);
     for (i = npages_basemem; i < end; ++i) {
         pages[i].pp_ref = 1; // ramdom nonzero number
         pages[i].pp_link = NULL;
