@@ -571,8 +571,25 @@ pdpe_walk(pdpe_t *pdpe,const void *va,int create){
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-    // Fill this function in
-    return NULL;
+    pde_t *pte_entry;
+    struct PageInfo *newPage = NULL;
+    //pte_t *retval = NULL;
+    uint64_t index = PDX(va);
+    pde_t pde_entry = pgdir[index];
+
+    if (pde_entry & PTE_P) {
+        pte_entry = (pte_t *)(KADDR(pde_entry & ~0xFFF));
+    } else {
+        if (!create)
+            return NULL;
+        newPage = page_alloc(ALLOC_ZERO);
+        if (!newPage)
+            return NULL;
+        newPage->pp_ref++;
+        pte_entry = (pte_t *)page2kva(newPage);
+        pgdir[index] = (pde_t)(PADDR(pte_entry) | PTE_P | PTE_W | PTE_U);
+    }
+    return (pte_t *)pte_entry + PTX(va);
 }
 
 //
