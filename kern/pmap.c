@@ -530,8 +530,35 @@ pml4e_walk(pml4e_t *pml4e, const void *va, int create)
 // Hints are the same as in pml4e_walk
 pte_t *
 pdpe_walk(pdpe_t *pdpe,const void *va,int create){
+    pde_t *pde_entry;
+    struct PageInfo *newPage = NULL;
+    pte_t *retval = NULL;
+    uint64_t index = PDPE(va);
+    pdpe_t pdpe_entry = pdpe[index];
 
-    return NULL;
+    if (pdpe_entry & PTE_P) {
+        pde_entry = (pde_t *)(KADDR(pdpe_entry & ~0xFFF));
+        retval = (pte_t *)pgdir_walk(pde_entry, va, create);
+        if (!retval)
+            return NULL;
+    } else {
+        if (!create)
+            return NULL;
+        newPage = page_alloc(ALLOC_ZERO);
+        if (!newPage)
+            return NULL;
+        newPage->pp_ref++;
+        pde_entry = (pde_t *)page2kva(newPage);
+        pdpe[index] = (pdpe_t)(PADDR(pde_entry) | PTE_P | PTE_W | PTE_U);
+        retval = (pte_t *)pgdir_walk(pde_entry, va, create);
+        if (!retval) {
+            pdpe[index] = (pdpe_t)0;
+            newPage->pp_ref--;
+            if (newPage->pp_ref == 0)
+                page_free(newPage);
+        }
+    }
+    return retval;
 }
 // Given 'pgdir', a pointer to a page directory, pgdir_walk returns
 // a pointer to the page table entry (PTE) in the final page table. 
