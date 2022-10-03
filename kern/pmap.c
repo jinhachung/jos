@@ -361,7 +361,7 @@ page_init(void)
     for (i = 1; i < npages_basemem; ++i) {
         pages[i].pp_ref = 0;
         pages[i].pp_link = NULL;
-        if(last)
+        if (last)
             last->pp_link = &pages[i];
         else
             page_free_list = &pages[i];
@@ -378,7 +378,7 @@ page_init(void)
     for (i = end; i < npages; ++i) {
         pages[i].pp_ref = 0;
         pages[i].pp_link = NULL;
-        if(last)
+        if (last)
             last->pp_link = &pages[i];
         else
             page_free_list = &pages[i];
@@ -410,6 +410,7 @@ page_alloc(int alloc_flags)
     newPage = page_free_list;
     page_free_list = page_free_list->pp_link;
     newPage->pp_link = NULL;
+    assert(newPage->pp_ref == 0);
     // translate to kernel virtual address
     // if (alloc_flags & ALLOC_ZERO), fills entire returned physical page with 0s
     if (alloc_flags & ALLOC_ZERO)
@@ -483,7 +484,43 @@ page_decref(struct PageInfo* pp)
 pte_t *
 pml4e_walk(pml4e_t *pml4e, const void *va, int create)
 {
-    return NULL;
+    pdpe_t *pdpe_entry;
+    struct PageInfo *newPage = NULL;
+    pte_t *retval = NULL;
+    uint64_t index = PML4(va);
+    pml4e_t pml4e_entry = pml4e[index];
+
+    if (pml4e_entry & PTE_P) {
+        pdpe_entry = (pdpe_t *)(KADDR(pml4e_entry & ~0xFFF));
+        retval = (pte_t *)pdpe_walk(pdpe_entry, va, create);
+        if (!retval)
+            return NULL;
+    } else {
+        //if PDPE does not exist yet and create -- false, return NULL
+        if (!create)
+            return NULL;
+        // otherwise, allocates a new PDPE page with page_alloc
+        newPage = page_alloc(ALLOC_ZERO);
+        // if allocation fails, return NULL
+        if (!newPage)
+            return NULL;
+        // otherwise, increment new page's reference count, clear page, and call pdpe_walk
+        newPage->pp_ref++;
+        pdpe_entry = (pdpe_t *)page2kva(newPage);
+        // add PHYSICAL ADDRESS (!!!) of new entry to PML4 table with the right flags - present/writable/user
+        pml4e[index] = (pml4e_t)(PADDR(pdpe_entry) | PTE_P | PTE_W | PTE_U);
+        retval = (pte_t *)pdpe_walk(pdpe_entry, va, create);
+        //pml4e[index] = (retval) ? ((pml4e_t)(PADDR(pdpe_entry) | PTE_P | PTE_W | PTE_U)) : ((pml4e_t)0);
+        if (!retval) {
+            // zero-out entry
+            pml4e[index] = (pml4e_t)0;
+            // decrease reference and free if not referenced by any
+            newPage->pp_ref--;
+            if (newPage->pp_ref == 0)
+                page_free(newPage);
+        }
+    }
+    return retval;
 }
 
 
