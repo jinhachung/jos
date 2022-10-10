@@ -653,7 +653,9 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
     // "TLB must be invalidated if a page was formerly present at 'va'
     if ((*pte) & PTE_P) {
         page_remove(pml4e, va);
-        // TODO: invalidated TLB
+        // TODO: invalidated TLB -- is this right? tlb_invalidate is not mentioned in the hint...
+        // --> do nothing because page_remove() already calls tlb_invalidate :)
+        //tlb_invalidate(pml4e, va);
     }
     pa = page2pa(pp);
     *pte = ROUNDDOWN(pa, PGSIZE) + (perm | PTE_P);
@@ -708,6 +710,18 @@ void
 page_remove(pml4e_t *pml4e, void *va)
 {
     // Fill this function in
+    pte_t *entry;
+    struct PageInfo *lookupPage = page_lookup(pml4e, va, &entry);
+    if (lookupPage) {
+        // ref count on the physical page should decrement
+        // physical page should be freed if the refcount reaches 0 <- done by page_decref
+        page_decref(lookupPage);
+        // ph table entry corresponding to 'va' should be set to 0 (if such a PTE exists)
+        *entry = 0;
+        // TLB must be invalidated if you remove an entry from the page table
+        tlb_invalidate(pml4e, va);
+    }
+    // if there is no physical page at that address, silently does nothing
 }
 
 //
