@@ -678,6 +678,14 @@ struct PageInfo *
 page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store)
 {
     // Fill this function in
+    pte_t *pte = pml4e_walk(pml4e, va, 0);
+    if (pte && ((*pte) & PTE_P)) {
+        // if pte_store is not zero, store in it the address
+        if (pte_store)
+            *pte_store = pte;
+        return pa2page((physaddr_t)(*pte));
+    }
+    // return NULL if there is no page mapped at va
     return NULL;
 }
 
