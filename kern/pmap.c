@@ -262,8 +262,7 @@ x64_vm_init(void)
     // array.  'npages' is the number of physical pages in memory.
     // Your code goes here:
     pages = (struct PageInfo *)boot_alloc(npages * sizeof(struct PageInfo));
-    //TODO: initialize memory here?
-    
+    // jchung: no need to initialize memory here because page_alloc() does that for us
     //////////////////////////////////////////////////////////////////////
     // Now that we've allocated the initial kernel data structures, we set
     // up the list of free physical pages. Once we've done so, all further
@@ -280,7 +279,7 @@ x64_vm_init(void)
     //      (ie. perm = PTE_U | PTE_P)
     //    - pages itself -- kernel RW, user NONE
     // Your code goes here:
-    //TODO: write here for lab#2 exercise#1
+    boot_map_region(boot_pml4e, UPAGES, npages * sizeof(struct PageInfo), PADDR(pages), PTE_P | PTE_U);
     //////////////////////////////////////////////////////////////////////
     // Use the physical memory that 'bootstack' refers to as the kernel
     // stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -292,7 +291,10 @@ x64_vm_init(void)
     //       overwrite memory.  Known as a "guard page".
     //     Permissions: kernel RW, user NONE
     // Your code goes here:
-    //TODO: write here for lab#2 exercise#1
+    // jchung: I'm not sure why it has to be PADDR(bootstack) but checking check_boot_pml4e() helped me write this hehe :)
+    boot_map_region(boot_pml4e, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_P | PTE_W);
+    // jchung: for [KSTACKTOP - PTSIZE, KSTACKTOP - KSTKSIZE):
+    // 'not backed' literally means 'do not map' which is why we page fault when we access any of these guard pages
     //////////////////////////////////////////////////////////////////////
     // Map all of physical memory at KERNBASE. We have detected the number
     // of physical pages to be npages.
@@ -300,9 +302,9 @@ x64_vm_init(void)
     //      the PA range [0, npages*PGSIZE)
     // Permissions: kernel RW, user NONE
     // Your code goes here: 
-    //TODO: write here for lab#2 exercise#5
     // Check that the initial page directory has been set up correctly.
-
+    boot_map_region(boot_pml4e, KERNBASE, npages * PGSIZE, 0, PTE_P | PTE_W);
+    
     check_page_free_list(1);
     check_page_alloc();
     page_check();
@@ -607,11 +609,11 @@ boot_map_region(pml4e_t *pml4e, uintptr_t la, size_t size, physaddr_t pa, int pe
 {
     // Fill this function in
     pte_t *pte;
-    for (size_t index = 0; index < size; index += PGSIZE) {
+    for (size_t offset = 0; offset < size; offset += PGSIZE) {
         // get PTE using pml4e_walk as hinted by TA - pml4e_walk(pml4e_t *pml4e, const void *va, int create)
-        pte = pml4e_walk(pml4e, (void *)(la + index * PGSIZE), 1);
+        pte = pml4e_walk(pml4e, (void *)(la + offset), 1);
         // set PTE value to physical address
-        *pte = (pte_t)(ROUNDDOWN(pa + index * PGSIZE, PGSIZE) + perm);
+        *pte = (pte_t)(ROUNDDOWN(pa + offset, PGSIZE) + perm);
     }
 }
 
