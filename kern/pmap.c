@@ -606,6 +606,13 @@ static void
 boot_map_region(pml4e_t *pml4e, uintptr_t la, size_t size, physaddr_t pa, int perm)
 {
     // Fill this function in
+    pte_t *pte;
+    for (size_t index = 0; index < size; index += PGSIZE) {
+        // get PTE using pml4e_walk as hinted by TA - pml4e_walk(pml4e_t *pml4e, const void *va, int create)
+        pte = pml4e_walk(pml4e, (void *)(la + index * PGSIZE), 1);
+        // set PTE value to physical address
+        *pte = (pte_t)(pa + index * PGSIZE + perm);
+    }
 }
 
 //
