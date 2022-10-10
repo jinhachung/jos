@@ -611,7 +611,7 @@ boot_map_region(pml4e_t *pml4e, uintptr_t la, size_t size, physaddr_t pa, int pe
         // get PTE using pml4e_walk as hinted by TA - pml4e_walk(pml4e_t *pml4e, const void *va, int create)
         pte = pml4e_walk(pml4e, (void *)(la + index * PGSIZE), 1);
         // set PTE value to physical address
-        *pte = (pte_t)(pa + index * PGSIZE + perm);
+        *pte = (pte_t)(ROUNDDOWN(pa + index * PGSIZE, PGSIZE) + perm);
     }
 }
 
@@ -644,6 +644,22 @@ int
 page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
 {
     // Fill this function in
+    pte_t *pte = pml4e_walk(pml4e, va, 1);
+    physaddr_t pa;
+    // return -E_NO_MEM if page table couldn't be allocated
+    if (!pte)
+        return -E_NO_MEM;
+    // if there is already a page mapped at 'va', it should be page_remove()d
+    // "TLB must be invalidated if a page was formerly present at 'va'
+    if ((*pte) & PTE_P) {
+        page_remove(pml4e, va);
+        // TODO: invalidated TLB
+    }
+    pa = page2pa(pp);
+    *pte = ROUNDDOWN(pa, PGSIZE) + (perm | PTE_P);
+    pp->pp_ref++;
+    // TODO: what happens when pp is re-inserted at same VA in the same pgdir?
+    // currently I'm just overwriting PTE value... but is this OK?
     return 0;
 }
 
