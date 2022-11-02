@@ -296,6 +296,18 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+    uint64_t start = ROUNDDOWN((uint64_t)va, PGSIZE);
+    uint64_t end = ROUNDUP((uint64_t)(va + len), PGSIZE);
+    for (uint64_t vaddr = start; vaddr < end; vaddr += PGSIZE) {
+        struct PageInfo *page = page_alloc(ALLOC_ZERO);
+        // panic if any allocation attempt fails
+        if (!page)
+            panic("region_alloc: out of free pages\n");
+        // map physical page 'pgae' to VA vaddr
+        // usage: page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
+        // perm - 'pages should be writable by user and kernel'
+        page_insert(e->env_pml4e, page, vaddr, PTE_W | PTE_U);
+    }
 }
 
 //
