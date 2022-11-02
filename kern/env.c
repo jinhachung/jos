@@ -362,13 +362,44 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  You must also do something with the program's entry point,
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
+    // jchung: --> answer: lcr3() to load CR3
 
 	// LAB 3: Your code here
+    struct Proghdr *ph, *eph;
+    struct Elf *elf = (struct Elf *)binary;
+    // 'you must also do something with the program's entry point,
+    // to make sure that the environment starts executing there'
+    lcr3(e->env_cr3);
+    // 'load_icode panics if it encounters problems'
+    if (elf->e_magic != ELF_MAGIC)
+        panic("load_icode: invalid ELF magic number\n");
+    
+    // set and traverse ELF as was done at boot/main.c:bootmain()
+    ph = (struct Proghdr *)((uint8_t *)binary + elf->e_phoff);
+    eph = ph + elf->e_phnum;
+    for (; ph < eph; ++ph) {
+        // 'you should only load segments with ph->p_type == ELF_PROG_LOAD'
+        // 'the ELF header should have ph->p_filesz <= ph->p_memsz'
+        if ((ph->p_type != ELF_PROG_LOAD) || (ph->p_filesz <= ph->p_memsz))
+            continue;
+        // 'load each program segment into virtual memory
+        // at the address specified in the ELF section header'
+        region_alloc(e, (void *)(ph->p_va), ph->p_memsz);
+        // 'the ph->p_filesz bytes from the ELF binary,
+        // starting at binary + ph->p_offset, should be copied to virtual address ph->p_va'
+        memcpy((void *)(ph->p_va), binary + ph->p_offset, ph->p_filesz);
+        // 'any remaining memory bytes should be cleared to zero'
+        memset((void *)(ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+    }
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
 	// LAB 3: Your code here.
+    region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
 	e->elf = binary;
+    // jchung: should set USTACKTOP as initial stack pointer for environment
+    e->env_tf.tf_rsp = USTACKTOP;
+    // TODO: done?
 }
 
 //
