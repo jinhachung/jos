@@ -120,6 +120,16 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+    for (int i = NENV - 1; i >= 0; --i) {
+        envs[i].env_id = 0;
+        // make env_link traversal become: 0 -> 1 -> 2 -> ...
+        if (i == NENV - 1)
+            envs[i].env_link = NULL;
+        else
+            envs[i].env_link = &envs[i + 1];
+    }
+    // make free list point to all envs
+    env_free_list = envs;
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -186,6 +196,17 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+    // you need to increment env_pml4e's pp_ref for env_free to work correctly
+    p->pp_ref++;
+    // set e->env_pml4e, should be KVA
+    e->env_pml4e = (pml4e_t *)page2kva(p);
+    // jchung: I think e->env_cr3 should also be set but do only what I am told to for now
+    //e->env_cr3 = page2pa(p);
+    // initialize page directory - everything above UTOP needs to be mapped into every environment's virtual space:
+    // "simple copying of this entry from kernel's pml4 to the environment's pml4"
+    for (int i = PML4(UTOP); i < NPMLENTRIES; ++i) {
+        e->env_pml4e[i] = boot_pml4e[i];
+    }
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
