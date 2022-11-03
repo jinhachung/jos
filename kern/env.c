@@ -413,6 +413,14 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+    struct Env *e;
+    // 'new env's parent ID is set to 0'
+    int ret = env_alloc(&e, 0);
+    if (ret)
+        panic("env_create: failed env_alloc with %e\n", ret);
+    load_icode(e, binary);
+    e->env_type = type;
+
 }
 
 //
@@ -550,7 +558,19 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
-	panic("env_run not yet implemented");
+    // 'set current environment (if any) back to ENV_RUNNABLE if it is ENV_RUNNING
+    if ((curenv) && (curenv->env_status == ENV_RUNNING))
+        curenv->env_status = ENV_RUNNABLE;
+    // 'set curenv to the new environment'
+    curenv = e;
+    // 'set its status to ENV_RUNNING'
+    curenv->env_status = ENV_RUNNING
+    // 'update its env_runs counter'
+    curenv->env_runs++;
+    // 'use lcr3() to switch to its address space'
+    lcr3(curenv->env_cr3);
+    // 'use env_pop_tf() to restore the environment's registers
+    // and drop into user mode in the environment'
+    env_pop_tf(&curenv->env_tf);
 }
 
