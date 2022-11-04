@@ -380,7 +380,7 @@ load_icode(struct Env *e, uint8_t *binary)
     for (; ph < eph; ++ph) {
         // 'you should only load segments with ph->p_type == ELF_PROG_LOAD'
         // 'the ELF header should have ph->p_filesz <= ph->p_memsz'
-        if ((ph->p_type != ELF_PROG_LOAD) || (ph->p_filesz <= ph->p_memsz))
+        if ((ph->p_type != ELF_PROG_LOAD) || (ph->p_filesz > ph->p_memsz))
             continue;
         // 'load each program segment into virtual memory
         // at the address specified in the ELF section header'
