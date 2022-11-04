@@ -134,7 +134,6 @@ env_init(void)
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
-
 // Load GDT and segment descriptors.
 void
 env_init_percpu(void)
@@ -201,7 +200,7 @@ env_setup_vm(struct Env *e)
     // set e->env_pml4e, should be KVA
     e->env_pml4e = (pml4e_t *)page2kva(p);
     // jchung: I think e->env_cr3 should also be set but do only what I am told to for now
-    //e->env_cr3 = page2pa(p);
+    e->env_cr3 = page2pa(p);
     // initialize page directory - everything above UTOP needs to be mapped into every environment's virtual space:
     // "simple copying of this entry from kernel's pml4 to the environment's pml4"
     for (int i = PML4(UTOP); i < NPMLENTRIES; ++i) {
@@ -214,7 +213,6 @@ env_setup_vm(struct Env *e)
 
 	return 0;
 }
-
 
 //
 // Allocates and initializes a new environment.
@@ -300,13 +298,14 @@ region_alloc(struct Env *e, void *va, size_t len)
     uint64_t end = ROUNDUP((uint64_t)(va + len), PGSIZE);
     for (uint64_t vaddr = start; vaddr < end; vaddr += PGSIZE) {
         struct PageInfo *page = page_alloc(ALLOC_ZERO);
-        // panic if any allocation attempt fails
+        // 'panic if any allocation attempt fails'
         if (!page)
             panic("region_alloc: out of free pages\n");
-        // map physical page 'pgae' to VA vaddr
+        // map physical page to VA vaddr
         // usage: page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
         // perm - 'pages should be writable by user and kernel'
-        page_insert(e->env_pml4e, page, vaddr, PTE_W | PTE_U);
+        page_insert(e->env_pml4e, page, (void *)vaddr, PTE_W | PTE_U);
+        //page_insert(e->env_pml4e, page, (void *)vaddr, PTE_USER);
     }
 }
 
@@ -377,6 +376,7 @@ load_icode(struct Env *e, uint8_t *binary)
     // set and traverse ELF as was done at boot/main.c:bootmain()
     ph = (struct Proghdr *)((uint8_t *)binary + elf->e_phoff);
     eph = ph + elf->e_phnum;
+	//e->elf = binary;
     for (; ph < eph; ++ph) {
         // 'you should only load segments with ph->p_type == ELF_PROG_LOAD'
         // 'the ELF header should have ph->p_filesz <= ph->p_memsz'
@@ -399,6 +399,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	e->elf = binary;
     // jchung: should set USTACKTOP as initial stack pointer for environment
     e->env_tf.tf_rsp = USTACKTOP;
+    e->env_tf.tf_rip = elf->e_entry;
     // TODO: done?
 }
 
@@ -510,7 +511,6 @@ env_destroy(struct Env *e)
 		monitor(NULL);
 }
 
-
 //
 // Restores the register values in the Trapframe with the 'iret' instruction.
 // This exits the kernel and starts executing some environment's code.
@@ -564,7 +564,7 @@ env_run(struct Env *e)
     // 'set curenv to the new environment'
     curenv = e;
     // 'set its status to ENV_RUNNING'
-    curenv->env_status = ENV_RUNNING
+    curenv->env_status = ENV_RUNNING;
     // 'update its env_runs counter'
     curenv->env_runs++;
     // 'use lcr3() to switch to its address space'
