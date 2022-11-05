@@ -89,11 +89,13 @@ trap_init(void)
     extern void XTRAPX_SIMDERR();
     extern void XTRAPX_SYSCALL();
     extern void XTRAPX_DEFAULT();
-    // TODO: how to determine descriptor privilege level (DPL, 5th argument)?
     SETGATE(idt[T_DIVIDE], 0, GD_KT, XTRAPX_DIVIDE, 0);
     SETGATE(idt[T_DEBUG], 0, GD_KT, XTRAPX_DEBUG, 0);
     SETGATE(idt[T_NMI], 0, GD_KT, XTRAPX_NMI, 0);
-    SETGATE(idt[T_BRKPT], 0, GD_KT, XTRAPX_BRKPT, 0);
+    // jchung: from L3E5
+    // 'general protection fault depending on how you initialized the break point entry in the IDT'
+    // set DPL to 3 and not 0 for it to cause breakpoint exception and not general protection fault
+    SETGATE(idt[T_BRKPT], 0, GD_KT, XTRAPX_BRKPT, 3);
     SETGATE(idt[T_OFLOW], 0, GD_KT, XTRAPX_OFLOW, 0);
     SETGATE(idt[T_BOUND], 0, GD_KT, XTRAPX_BOUND, 0);
     SETGATE(idt[T_ILLOP], 0, GD_KT, XTRAPX_ILLOP, 0);
@@ -195,18 +197,25 @@ static void
 trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
+    //print_trapframe(tf);
 	// LAB 3: Your code here.
-    if (tf->tf_trapno == T_PGFLT) {
+    switch (tf->tf_trapno) {
+    case T_PGFLT:
         page_fault_handler(tf);
+        break;
+    case T_BRKPT:
+        monitor(tf);
+        break;
+    default:
+        // Unexpected trap: The user process or the kernel has a bug.
+	    print_trapframe(tf);
+	    if (tf->tf_cs == GD_KT)
+	        panic("unhandled trap in kernel");
+	    else {
+	        env_destroy(curenv);
+	        return;
+	    }
     }
-    // Unexpected trap: The user process or the kernel has a bug.
-	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
-		panic("unhandled trap in kernel");
-	else {
-		env_destroy(curenv);
-		return;
-	}
 }
 
 void
