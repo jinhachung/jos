@@ -112,7 +112,7 @@ trap_init(void)
     SETGATE(idt[T_ALIGN], 0, GD_KT, XTRAPX_ALIGN, 0);
     SETGATE(idt[T_MCHK], 0, GD_KT, XTRAPX_MCHK, 0);
     SETGATE(idt[T_SIMDERR], 0, GD_KT, XTRAPX_SIMDERR, 0);
-    SETGATE(idt[T_SYSCALL], 0, GD_KT, XTRAPX_SYSCALL, 0);
+    SETGATE(idt[T_SYSCALL], 0, GD_KT, XTRAPX_SYSCALL, 3);
     SETGATE(idt[T_DEFAULT], 0, GD_KT, XTRAPX_DEFAULT, 0);
 
 	idt_pd.pd_lim = sizeof(idt)-1;
@@ -205,6 +205,14 @@ trap_dispatch(struct Trapframe *tf)
         break;
     case T_BRKPT:
         monitor(tf);
+        break;
+    case T_SYSCALL:
+        tf->tf_regs.reg_rax = syscall(tf->tf_regs.reg_rax,
+                                      tf->tf_regs.reg_rdx,
+                                      tf->tf_regs.reg_rcx,
+                                      tf->tf_regs.reg_rbx,
+                                      tf->tf_regs.reg_rdi,
+                                      tf->tf_regs.reg_rsi);
         break;
     default:
         // Unexpected trap: The user process or the kernel has a bug.
