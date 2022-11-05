@@ -74,8 +74,8 @@
  * #define T_SYSCALL   48		// system call
  * #define T_DEFAULT   500		// catchall
  * jchung: whether each of the vector has an error code or not was checked by referring to:
- * https://casys-kaist.github.io/jos/ref/i386/s09_10.htm
- * TODO: determine if errors 17, 18, 19, 48, and 500 need error codes or not
+ * https://casys-kaist.github.io/jos/ref/i386/s09_10.htm    (for codes 01-16)
+ * https://wiki.osdev.org/Exceptions                        (for codes 17-19)
  */
     TRAPHANDLER_NOEC(XTRAPX_DIVIDE, T_DIVIDE)
     TRAPHANDLER_NOEC(XTRAPX_DEBUG, T_DEBUG)
@@ -86,17 +86,17 @@
     TRAPHANDLER_NOEC(XTRAPX_ILLOP, T_ILLOP)
     TRAPHANDLER_NOEC(XTRAPX_DEVICE, T_DEVICE)
     TRAPHANDLER(XTRAPX_DBLFLT, T_DBLFLT)
-    TRAPHANDLER_NOEC(XTRAPX_COPROC, T_COPROF) // reserved
+    TRAPHANDLER_NOEC(XTRAPX_COPROC, T_COPROF)   #reserved
     TRAPHANDLER(XTRAPX_TSS, T_TSS)
     TRAPHANDLER(XTRAPX_SEGNP, T_SEGNP)
     TRAPHANDLER(XTRAPX_STACK, T_STACK)
     TRAPHANDLER(XTRAPX_GPFLT, T_GPFLT)
     TRAPHANDLER(XTRAPX_PGFLT, T_PGFLT)
-    TRAPHANDLER_NOEC(XTRAPX_RES, T_RES) // reserved
+    TRAPHANDLER_NOEC(XTRAPX_RES, T_RES)         #reserved
     TRAPHANDLER_NOEC(XTRAPX_FPERR, T_FPERR)
-    TRAPHANDLER_????(XTRAPX_ALIGN, T_ALIGN)
-    TRAPHANDLER_????(XTRAPX_MCHK, T_MCHK)
-    TRAPHANDLER_????(XTRAPX_SIMDERR, T_SIMDERR)
+    TRAPHANDLER(XTRAPX_ALIGN, T_ALIGN)
+    TRAPHANDLER_NOEC(XTRAPX_MCHK, T_MCHK)
+    TRAPHANDLER_NOEC(XTRAPX_SIMDERR, T_SIMDERR)
     TRAPHANDLER_????(XTRAPX_SYSCALL, T_SYSCALL)
     TRAPHANDLER_????(XTRAPX_DEFAULT, T_DEFAULT)
 /*
@@ -105,4 +105,29 @@
  * Hint: Be sure to review the x64 calling convention from lab1
  *       for how to pass a pointer to the trapframe.
  */
+/* jchung: order of implementation provided in document:
+ * 1. push values to make the stack look like a struct Trapframe
+ * 2. load GD_KD into %ds and %es
+ * 3. pass a pointer to the Trapframe as an argument to trap() (Hint: Review the x64 calling convention from lab 1)
+ * 4. call trap (can trap ever return?)
+ */
+_alltraps:
+    /* because we will be polluting %es and %ds */
+    pushl %ds
+    pushl %es
+    /* 1. push values to make the stack look like a struct Trapframe */
+    PUSHA
+    /* 2. load GD_KD into %ds and %es */
+    movl $GD_KD, %ds
+    movl $GD_KD, %es
+    /* 3. pass a pointer to the Trapframe as an argument to trap() */
+    movl %rsp, %rdi
+    /* 4. call trap */
+    call trap
+    /* does trap return? */
+    /* jchung: IDK, but return things as they were before */
+    POPA_
+    popl %es
+    popl %ds
+    iret
 
