@@ -66,6 +66,53 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+    // jchung: first declare functions as extern void, and then use SETGATE
+    extern void XTRAPX_DIVIDE();
+    extern void XTRAPX_DEBUG();
+    extern void XTRAPX_NMI();
+    extern void XTRAPX_BRKPT();
+    extern void XTRAPX_OFLOW();
+    extern void XTRAPX_BOUND();
+    extern void XTRAPX_ILLOP();
+    extern void XTRAPX_DEVICE();
+    extern void XTRAPX_DBLFLT();
+    //extern void XTRAPX_COPROC();
+    extern void XTRAPX_TSS();
+    extern void XTRAPX_SEGNP();
+    extern void XTRAPX_STACK();
+    extern void XTRAPX_GPFLT();
+    extern void XTRAPX_PGFLT();
+    //extern void XTRAPX_RES();
+    extern void XTRAPX_FPERR();
+    extern void XTRAPX_ALIGN();
+    extern void XTRAPX_MCHK();
+    extern void XTRAPX_SIMDERR();
+    extern void XTRAPX_SYSCALL();
+    extern void XTRAPX_DEFAULT();
+    // TODO: how to determine descriptor privilege level (DPL, 5th argument)?
+    SETGATE(idt[T_DIVIDE], 0, GD_KT, XTRAPX_DIVIDE, 0);
+    SETGATE(idt[T_DEBUG], 0, GD_KT, XTRAPX_DEBUG, 0);
+    SETGATE(idt[T_NMI], 0, GD_KT, XTRAPX_NMI, 0);
+    SETGATE(idt[T_BRKPT], 0, GD_KT, XTRAPX_BRKPT, 0);
+    SETGATE(idt[T_OFLOW], 0, GD_KT, XTRAPX_OFLOW, 0);
+    SETGATE(idt[T_BOUND], 0, GD_KT, XTRAPX_BOUND, 0);
+    SETGATE(idt[T_ILLOP], 0, GD_KT, XTRAPX_ILLOP, 0);
+    SETGATE(idt[T_DEVICE], 0, GD_KT, XTRAPX_DEVICE, 0);
+    SETGATE(idt[T_DBLFLT], 0, GD_KT, XTRAPX_DBLFLT, 0);
+    //SETGATE(idt[T_COPROC], 0, GD_KT, XTRAPX_COPROC, 0);
+    SETGATE(idt[T_TSS], 0, GD_KT, XTRAPX_TSS, 0);
+    SETGATE(idt[T_SEGNP], 0, GD_KT, XTRAPX_SEGNP, 0);
+    SETGATE(idt[T_STACK], 0, GD_KT, XTRAPX_STACK, 0);
+    SETGATE(idt[T_GPFLT], 0, GD_KT, XTRAPX_GPFLT, 0);
+    SETGATE(idt[T_PGFLT], 0, GD_KT, XTRAPX_PGFLT, 0);
+    //SETGATE(idt[T_RES], 0, GD_KT, XTRAPX_RES, 0);
+    SETGATE(idt[T_FPERR], 0, GD_KT, XTRAPX_FPERR, 0);
+    SETGATE(idt[T_ALIGN], 0, GD_KT, XTRAPX_ALIGN, 0);
+    SETGATE(idt[T_MCHK], 0, GD_KT, XTRAPX_MCHK, 0);
+    SETGATE(idt[T_SIMDERR], 0, GD_KT, XTRAPX_SIMDERR, 0);
+    SETGATE(idt[T_SYSCALL], 0, GD_KT, XTRAPX_SYSCALL, 0);
+    SETGATE(idt[T_DEFAULT], 0, GD_KT, XTRAPX_DEFAULT, 0);
+
 	idt_pd.pd_lim = sizeof(idt)-1;
 	idt_pd.pd_base = (uint64_t)idt;
 	// Per-CPU setup

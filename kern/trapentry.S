@@ -76,6 +76,7 @@
  * jchung: whether each of the vector has an error code or not was checked by referring to:
  * https://casys-kaist.github.io/jos/ref/i386/s09_10.htm    (for codes 01-16)
  * https://wiki.osdev.org/Exceptions                        (for codes 17-19)
+ * TODO: check whether codes 48 and 500 use error codes or not
  */
     TRAPHANDLER_NOEC(XTRAPX_DIVIDE, T_DIVIDE)
     TRAPHANDLER_NOEC(XTRAPX_DEBUG, T_DEBUG)
@@ -86,19 +87,19 @@
     TRAPHANDLER_NOEC(XTRAPX_ILLOP, T_ILLOP)
     TRAPHANDLER_NOEC(XTRAPX_DEVICE, T_DEVICE)
     TRAPHANDLER(XTRAPX_DBLFLT, T_DBLFLT)
-    TRAPHANDLER_NOEC(XTRAPX_COPROC, T_COPROF)   #reserved
+    /*TRAPHANDLER_NOEC(XTRAPX_COPROC, T_COPROF)*/
     TRAPHANDLER(XTRAPX_TSS, T_TSS)
     TRAPHANDLER(XTRAPX_SEGNP, T_SEGNP)
     TRAPHANDLER(XTRAPX_STACK, T_STACK)
     TRAPHANDLER(XTRAPX_GPFLT, T_GPFLT)
     TRAPHANDLER(XTRAPX_PGFLT, T_PGFLT)
-    TRAPHANDLER_NOEC(XTRAPX_RES, T_RES)         #reserved
+    /*TRAPHANDLER_NOEC(XTRAPX_RES, T_RES)*/
     TRAPHANDLER_NOEC(XTRAPX_FPERR, T_FPERR)
     TRAPHANDLER(XTRAPX_ALIGN, T_ALIGN)
     TRAPHANDLER_NOEC(XTRAPX_MCHK, T_MCHK)
     TRAPHANDLER_NOEC(XTRAPX_SIMDERR, T_SIMDERR)
-    TRAPHANDLER_????(XTRAPX_SYSCALL, T_SYSCALL)
-    TRAPHANDLER_????(XTRAPX_DEFAULT, T_DEFAULT)
+    TRAPHANDLER_NOEC(XTRAPX_SYSCALL, T_SYSCALL)
+    TRAPHANDLER_NOEC(XTRAPX_DEFAULT, T_DEFAULT)
 /*
  * Lab 3: Your code here for _alltraps
  *
@@ -113,21 +114,32 @@
  */
 _alltraps:
     /* because we will be polluting %es and %ds */
-    pushl %ds
-    pushl %es
+    /* jchung: for some reason, 'pushq %ds' and 'pushq %es' don't work? */
+    #pushq %ds
+    #pushq %es
+    subq $16, %rsp
+    movw %ds, 8(%rsp)
+    movw %es, 0(%rsp)
     /* 1. push values to make the stack look like a struct Trapframe */
     PUSHA
     /* 2. load GD_KD into %ds and %es */
-    movl $GD_KD, %ds
-    movl $GD_KD, %es
+    /* jchung: for some reason, 'movq $GD_KD, %ds' and 'movq $GD_KD, %es' don't work? */
+    #movq $GD_KD, %ds
+    #movq $GD_KD, %es
+    movq $GD_KD, %r15
+    movq %r15, %ds
+    movq %r15, %es
     /* 3. pass a pointer to the Trapframe as an argument to trap() */
-    movl %rsp, %rdi
+    movq %rsp, %rdi
     /* 4. call trap */
     call trap
     /* does trap return? */
     /* jchung: IDK, but return things as they were before */
     POPA_
-    popl %es
-    popl %ds
+    #popq %es
+    #popq %ds
+    movw 0(%rsp), %ds
+    movw 8(%rsp), %es
+    addq $16, %rsp
     iret
 
