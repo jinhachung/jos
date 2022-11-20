@@ -408,6 +408,11 @@ page_init(void)
     // NB: Remember to mark the memory used for initial boot page table i.e (va>=BOOT_PAGE_TABLE_START && va < BOOT_PAGE_TABLE_END) as in-use (not free)
     size_t i;
     struct PageInfo* last = NULL;
+
+    // Lab 4 stuff - mark the physical page at MPENTRY_PADDR as in use
+    struct PageInfo *mpPage = pa2page(MPENTRY_PADDR);
+    mpPage->pp_ref = 1;
+    
     // 1. mark physical page #0 as in use
     pages[0].pp_ref = 1; // random nonzero number
     pages[0].pp_link = NULL;
@@ -823,7 +828,17 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	//panic("mmio_map_region not implemented");
+    
+    void *va = (void *)base;
+    // be sure to round up to a multiple of PGSIZE and to handle if this reservation would overflow MMIOLIM
+    size = ROUNDUP(size, PGSIZE);
+    if (base + size > MMIOLIM)
+        panic("mmio_map_region: reservation overflows MMIOLIM: %x > MMIOLIM", base + size, MMIOLIM);
+    // simply create the mapping with PTE_PCD|PTE_PWT in addition to PTE_W
+    boot_map_region(boot_pml4e, base, size, pa, PTE_W | PTE_PWT | PTE_PCD);
+    base += size;
+    return va;
 }
 
 static uintptr_t user_mem_check_addr;
@@ -957,6 +972,7 @@ check_page_free_list(bool only_low_memory)
 	}
 
 	assert(nfree_extmem > 0);
+    //cprintf("check_page_free_list() succeeded!\n");
 }
 
 
