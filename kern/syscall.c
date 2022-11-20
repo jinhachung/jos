@@ -26,6 +26,8 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
+    //user_mem_check(curenv, (const void *)s, len, PTE_U);
+    user_mem_assert(curenv, (const void *)s, len, 0);
 
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
@@ -287,10 +289,25 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
-
+	/* jchung:
+     * from inc/syscall.h:
+     * SYS_cputs = 0,
+	 * SYS_cgetc,
+	 * SYS_getenvid,
+	 * SYS_env_destroy,
+	 * NSYSCALLS
+    */
 	switch (syscallno) {
-
+    case SYS_cputs:
+        sys_cputs((const char *)a1, (size_t)a2);
+        // TODO: return what?
+        return 0;
+    case SYS_cgetc:
+        return sys_cgetc();
+    case SYS_getenvid:
+        return sys_getenvid();
+    case SYS_env_destroy:
+        return sys_env_destroy((envid_t)a1);
 	default:
 		return -E_NO_SYS;
 	}
