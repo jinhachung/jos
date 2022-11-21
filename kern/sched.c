@@ -37,8 +37,6 @@ sched_yield(void)
     else
         envnum = ENVX(curenv->env_id) + 1; // next env
     
-    cprintf("sched_yield: starting search at env number %d % %d\n", envnum, NENV);
-    
     for (size_t i = 0; i < NENV; ++i) {
         size_t envIndex = (envnum + i) % NENV;
         // if runnable, switch
@@ -48,16 +46,12 @@ sched_yield(void)
         }
     }
 
-    if (nextEnvNum >= 0) {
-        //cprintf("sched_yield: scheduling env number %d with env ID %d\n", nextEnvNum, envs[nextEnvNum].env_id);
+    if (nextEnvNum >= 0)
         env_run(&envs[nextEnvNum]);
-    } else if (curenv && (curenv->env_status == ENV_RUNNING)) {
-        //cprintf("sched_yield: scheduling curenv as no envs are runnable\n");
+    else if (curenv && (curenv->env_status == ENV_RUNNING))
         env_run(curenv); // no envs are runnable but curenv is ENV_RUNNING
-    } else {
-        //cprintf("sched_yield: cannot schedule, calling sched_halt()\n");
+    else
         sched_halt();
-    }
 }
 
 

@@ -162,7 +162,6 @@ trap_init_percpu(void)
 
 	// Initialize the TSS slot of the gdt.
     // use gdt[(GD_TSS0 >> 3) + 2 * i] for CPU i's TSS descriptor
-    //SETTSS((struct SystemSegdesc64 *)(((uint64_t)(&gdt[(GD_TSS0 >> 3) + 2 * thiscpu->cpu_id]) >> 16) + 40 + thiscpu->cpu_id * 16),
     SETTSS((struct SystemSegdesc64 *)(&gdt[(GD_TSS0 >> 3) + 2 * thiscpu->cpu_id]),
            STS_T64A,
            (uint64_t)(&(thiscpu->cpu_ts)),
@@ -171,7 +170,6 @@ trap_init_percpu(void)
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
     ltr(((GD_TSS0 >> 3) + 2 * thiscpu->cpu_id) << 3);
-    //ltr(GD_TSS0);
 
 	// Load the IDT
 	lidt(&idt_pd);

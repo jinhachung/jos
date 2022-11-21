@@ -367,7 +367,6 @@ mem_init_mp(void)
     for (size_t i = 0; i < NCPU; ++i) {
         uintptr_t kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
         boot_map_region(boot_pml4e, kstacktop_i - KSTKSIZE, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_P | PTE_W);
-        cprintf("mem_init_mp: mapped [0x%lx, 0x%lx) to PA 0x%lx\n", kstacktop_i - KSTKSIZE, kstacktop_i, PADDR(percpu_kstacks[i]));
     }
 }
 
@@ -445,9 +444,6 @@ page_init(void)
     }
 
     // Lab 4 stuff - mark the physical page at MPENTRY_PADDR as in use by setting reference and relinking
-    //struct PageInfo *mpPage = pa2page(MPENTRY_PADDR);
-    //mpPage->pp_ref = 1;
-    //mpPage->pp_link = NULL;
     pages[MPENTRY_PADDR / PGSIZE].pp_ref = 1;
     pages[MPENTRY_PADDR / PGSIZE].pp_link = NULL;
     pages[MPENTRY_PADDR / PGSIZE - 1].pp_link = &pages[MPENTRY_PADDR / PGSIZE + 1];
@@ -718,12 +714,8 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
         return -E_NO_MEM;
     // if there is already a page mapped at 'va', it should be page_remove()d
     // "TLB must be invalidated if a page was formerly present at 'va'
-    if ((*pte) & PTE_P) {
+    if ((*pte) & PTE_P)
         page_remove(pml4e, va);
-        // TODO: invalidated TLB -- is this right? tlb_invalidate is not mentioned in the hint...
-        // --> do nothing because page_remove() already calls tlb_invalidate :)
-        //tlb_invalidate(pml4e, va);
-    }
     pa = page2pa(pp);
     *pte = ROUNDDOWN(pa, PGSIZE) + (perm | PTE_P);
     pp->pp_ref++;
@@ -836,8 +828,6 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	//panic("mmio_map_region not implemented");
-
     void *va = (void *)base;
     // be sure to round up to a multiple of PGSIZE and to handle if this reservation would overflow MMIOLIM
     size = ROUNDUP(size, PGSIZE);
@@ -845,7 +835,6 @@ mmio_map_region(physaddr_t pa, size_t size)
         panic("reservation overflows MMIOLIM: %x > MMIOLIM\n", base + size, MMIOLIM);
     // simply create the mapping with PTE_PCD|PTE_PWT in addition to PTE_W
     boot_map_region(boot_pml4e, base, size, pa, PTE_P | PTE_W | PTE_PWT | PTE_PCD);
-    //boot_map_region(boot_pml4e, base, size, pa, PTE_W | PTE_PWT | PTE_PCD);
     base += size;
 
     cprintf("mmio_map_region: mapped physical address 0x%lx to MMIO base 0x%p\n", pa, va);
