@@ -382,11 +382,38 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+    if (curenv->env_pgfault_upcall) {
+        struct UTrapframe *userTf;
+        // check if we were already on exception stack upon fault
+        // already in user exception stack area --> push empty 8B word and then struct UTrapframe
+        // not in user exception stack area     --> push struct UTrapframe
+        if (((UXSTACKTOP - PGSIZE) <= curenv->env_tf->tf_rsp) && (curenv->env_tf->tf_rsp < UXSTACKTOP))
+            userTf = (struct UTrapframe *)(curenv->env_tf->tf_rsp - sizeof(struct UTrapframe) - 8);
+        else
+            userTf = (struct UTrapframe *)(UXSTACKTOP - sizeof(struct UTrapframe));
+        
+        // use user_mem_assert to check if address is valid --> can we write to userTf as user?
+        user_mem_assert(curenv, (const void *)userTf, sizeof(struct UTrapframe), PTE_P | PTE_U | PTE_W);
+        // set registers
+        userTf->utf_fault_va    = fault_va;
+        userTf->utf_err         = curenv->env_tf->tf_err;
+        userTf->utf_regs        = curenv->env_tf->tf_regs;
+        userTf->utf_rip         = curenv->env_tf->tf_rip;
+        userTf->utf_eflags      = curenv->env_tf->tf_eflags;
+        userTf->utf_rsp         = curenv->env_tf->tf_rsp;
 
-	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_rip);
-	print_trapframe(tf);
-	env_destroy(curenv);
+        // return back to designated pagefault handler
+        curenv->env_tf.tf_rip = (uintptr_t)(curenv->env_pgfault_upcall);
+        curenv->env_tf.tf_rsp = (uintptr_t)userTf;
+
+        // return to execution?
+        env_run(curenv);
+    } else {
+	    // Destroy the environment that caused the fault.
+        // IF THERE IS NO PAGE FAULT HANDLER REGISTERED
+	    cprintf("[%08x] user fault va %08x ip %08x\n", curenv->env_id, fault_va, tf->tf_rip);
+	    print_trapframe(tf);
+	    env_destroy(curenv);
+    }
 }
 
