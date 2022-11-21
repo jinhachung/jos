@@ -387,8 +387,8 @@ page_fault_handler(struct Trapframe *tf)
         // check if we were already on exception stack upon fault
         // already in user exception stack area --> push empty 8B word and then struct UTrapframe
         // not in user exception stack area     --> push struct UTrapframe
-        if (((UXSTACKTOP - PGSIZE) <= curenv->env_tf->tf_rsp) && (curenv->env_tf->tf_rsp < UXSTACKTOP))
-            userTf = (struct UTrapframe *)(curenv->env_tf->tf_rsp - sizeof(struct UTrapframe) - 8);
+        if (((UXSTACKTOP - PGSIZE) <= curenv->env_tf.tf_rsp) && (curenv->env_tf.tf_rsp < UXSTACKTOP))
+            userTf = (struct UTrapframe *)(curenv->env_tf.tf_rsp - sizeof(struct UTrapframe) - 8);
         else
             userTf = (struct UTrapframe *)(UXSTACKTOP - sizeof(struct UTrapframe));
         
@@ -396,11 +396,11 @@ page_fault_handler(struct Trapframe *tf)
         user_mem_assert(curenv, (const void *)userTf, sizeof(struct UTrapframe), PTE_P | PTE_U | PTE_W);
         // set registers
         userTf->utf_fault_va    = fault_va;
-        userTf->utf_err         = curenv->env_tf->tf_err;
-        userTf->utf_regs        = curenv->env_tf->tf_regs;
-        userTf->utf_rip         = curenv->env_tf->tf_rip;
-        userTf->utf_eflags      = curenv->env_tf->tf_eflags;
-        userTf->utf_rsp         = curenv->env_tf->tf_rsp;
+        userTf->utf_err         = curenv->env_tf.tf_err;
+        userTf->utf_regs        = curenv->env_tf.tf_regs;
+        userTf->utf_rip         = curenv->env_tf.tf_rip;
+        userTf->utf_eflags      = curenv->env_tf.tf_eflags;
+        userTf->utf_rsp         = curenv->env_tf.tf_rsp;
 
         // return back to designated pagefault handler
         curenv->env_tf.tf_rip = (uintptr_t)(curenv->env_pgfault_upcall);
