@@ -30,8 +30,34 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
-	// sched_halt never returns
-	sched_halt();
+    int envnum;
+    int nextEnvNum = -1;
+    if (!curenv)
+        envnum = 0; // default if none
+    else
+        envnum = ENVX(curenv->env_id) + 1; // next env
+    
+    cprintf("sched_yield: starting search at env number %d % %d\n", envnum, NENV);
+    
+    for (size_t i = 0; i < NENV; ++i) {
+        size_t envIndex = (envnum + i) % NENV;
+        // if runnable, switch
+        if (envs[envIndex].env_status == ENV_RUNNABLE) {
+            nextEnvNum = envIndex;
+            break;
+        }
+    }
+
+    if (nextEnvNum >= 0) {
+        //cprintf("sched_yield: scheduling env number %d with env ID %d\n", nextEnvNum, envs[nextEnvNum].env_id);
+        env_run(&envs[nextEnvNum]);
+    } else if (curenv && (curenv->env_status == ENV_RUNNING)) {
+        //cprintf("sched_yield: scheduling curenv as no envs are runnable\n");
+        env_run(curenv); // no envs are runnable but curenv is ENV_RUNNING
+    } else {
+        //cprintf("sched_yield: cannot schedule, calling sched_halt()\n");
+        sched_halt();
+    }
 }
 
 

@@ -170,7 +170,7 @@ trap_init_percpu(void)
            0);
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-    //ltr(((GD_TSS0 >> 3) + 2 * thiscpu->cpu_id) << 3);
+    ltr(((GD_TSS0 >> 3) + 2 * thiscpu->cpu_id) << 3);
     //ltr(GD_TSS0);
 
 	// Load the IDT
@@ -302,6 +302,7 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+        lock_kernel();
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie

@@ -581,18 +581,39 @@ env_run(struct Env *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
+    // handle same environment?
+    /*
+    if (curenv == e){
+        cprintf("env_run: running same environment (curenv == e)\n");
+        curenv->env_runs += 1;
+        unlock_kernel();
+        env_pop_tf(&curenv->env_tf);
+    }
+    */
+    if (0) {
+        cprintf("env_run: running a different environment (curenv != e)\n");
+        cprintf("env_run: e - ID: %d, status: %d\n", e->env_id, e->env_status);
+        cprintf("env_run: \n");
+        cprintf("env_run: \n");
+    }
 	// LAB 3: Your code here.
     // 'set current environment (if any) back to ENV_RUNNABLE if it is ENV_RUNNING
-    if ((curenv) && (curenv->env_status == ENV_RUNNING))
+    if ((curenv) && (curenv->env_status == ENV_RUNNING)) {
+        //cprintf("env_run: setting curenv->env_status to ENV_RUNNABLE\n");
         curenv->env_status = ENV_RUNNABLE;
+    }
     // 'set curenv to the new environment'
     curenv = e;
     // 'set its status to ENV_RUNNING'
     curenv->env_status = ENV_RUNNING;
     // 'update its env_runs counter'
     curenv->env_runs++;
+    // jchung: loading CR3 means switching back to user mode --> unlock here (lab4)
+    //cprintf("env_run: e @ 0x%p, KERNBASE @ 0x%lx\n", e, KERNBASE);
+    unlock_kernel();
     // 'use lcr3() to switch to its address space'
     lcr3(curenv->env_cr3);
+    //unlock_kernel();
     // 'use env_pop_tf() to restore the environment's registers
     // and drop into user mode in the environment'
     env_pop_tf(&curenv->env_tf);
