@@ -96,6 +96,25 @@ trap_init(void)
     extern void XTRAPX_SIMDERR();
     extern void XTRAPX_SYSCALL();
     extern void XTRAPX_DEFAULT();
+
+    // Lab 4 - jchung
+    extern void XTRAPX_IRQ00();
+    extern void XTRAPX_IRQ01();
+    extern void XTRAPX_IRQ02();
+    extern void XTRAPX_IRQ03();
+    extern void XTRAPX_IRQ04();
+    extern void XTRAPX_IRQ05();
+    extern void XTRAPX_IRQ06();
+    extern void XTRAPX_IRQ07();
+    extern void XTRAPX_IRQ08();
+    extern void XTRAPX_IRQ09();
+    extern void XTRAPX_IRQ10();
+    extern void XTRAPX_IRQ11();
+    extern void XTRAPX_IRQ12();
+    extern void XTRAPX_IRQ13();
+    extern void XTRAPX_IRQ14();
+    extern void XTRAPX_IRQ15();
+
     SETGATE(idt[T_DIVIDE], 0, GD_KT, XTRAPX_DIVIDE, 0);
     SETGATE(idt[T_DEBUG], 0, GD_KT, XTRAPX_DEBUG, 0);
     SETGATE(idt[T_NMI], 0, GD_KT, XTRAPX_NMI, 0);
@@ -122,7 +141,25 @@ trap_init(void)
     SETGATE(idt[T_SYSCALL], 0, GD_KT, XTRAPX_SYSCALL, 3);
     SETGATE(idt[T_DEFAULT], 0, GD_KT, XTRAPX_DEFAULT, 0);
 
-	idt_pd.pd_lim = sizeof(idt)-1;
+    // Lab 4 - jchung
+	SETGATE(idt[IRQ_OFFSET + 0], 0, GD_KT, XTRAPX_IRQ00, 0);
+	SETGATE(idt[IRQ_OFFSET + 1], 0, GD_KT, XTRAPX_IRQ01, 0);
+	SETGATE(idt[IRQ_OFFSET + 2], 0, GD_KT, XTRAPX_IRQ02, 0);
+	SETGATE(idt[IRQ_OFFSET + 3], 0, GD_KT, XTRAPX_IRQ03, 0);
+	SETGATE(idt[IRQ_OFFSET + 4], 0, GD_KT, XTRAPX_IRQ04, 0);
+	SETGATE(idt[IRQ_OFFSET + 5], 0, GD_KT, XTRAPX_IRQ05, 0);
+	SETGATE(idt[IRQ_OFFSET + 6], 0, GD_KT, XTRAPX_IRQ06, 0);
+	SETGATE(idt[IRQ_OFFSET + 7], 0, GD_KT, XTRAPX_IRQ07, 0);
+	SETGATE(idt[IRQ_OFFSET + 8], 0, GD_KT, XTRAPX_IRQ08, 0);
+	SETGATE(idt[IRQ_OFFSET + 9], 0, GD_KT, XTRAPX_IRQ09, 0);
+	SETGATE(idt[IRQ_OFFSET + 10], 0, GD_KT, XTRAPX_IRQ10, 0);
+	SETGATE(idt[IRQ_OFFSET + 11], 0, GD_KT, XTRAPX_IRQ11, 0);
+	SETGATE(idt[IRQ_OFFSET + 12], 0, GD_KT, XTRAPX_IRQ12, 0);
+	SETGATE(idt[IRQ_OFFSET + 13], 0, GD_KT, XTRAPX_IRQ13, 0);
+	SETGATE(idt[IRQ_OFFSET + 14], 0, GD_KT, XTRAPX_IRQ14, 0);
+	SETGATE(idt[IRQ_OFFSET + 15], 0, GD_KT, XTRAPX_IRQ15, 0);
+    
+    idt_pd.pd_lim = sizeof(idt)-1;
 	idt_pd.pd_base = (uint64_t)idt;
 	// Per-CPU setup
 	trap_init_percpu();
