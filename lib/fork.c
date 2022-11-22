@@ -71,7 +71,20 @@ duppage(envid_t envid, unsigned pn)
     int r;
 
     // LAB 4: Your code here.
-    panic("duppage not implemented");
+    pte_t pte = uvpt[pn];
+    // if page is writable or CoW, create mapping as CoW
+    if ((pte & PTE_W) || (pte & PTE_COW)) {
+        // unset writable and set as CoW only;
+        pte = pte & (~PTE_W);
+        pte = pte | PTE_COW;
+        // remap current environment's page as new PTE as well
+        if (sys_page_map(0, (void *)(pn * PGSIZE), 0, (void *)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
+            panic("sys_page_map failed\n");
+    }
+    // map as PTE
+    if (sys_page_map(0, (void *)(pn * PGSIZE), envid, (void *)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
+        panic ("sys__page_map failed\n");
+
     return 0;
 }
 
