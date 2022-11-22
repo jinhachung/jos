@@ -6,7 +6,6 @@
 // PTE_COW marks copy-on-write page table entries.
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW     0x800
-
 //
 // Custom page fault handler - if faulting page is copy-on-write,
 // map in our own private writable copy.
@@ -25,7 +24,7 @@ pgfault(struct UTrapframe *utf)
     //   (see <inc/memlayout.h>).
 
     // LAB 4: Your code here.
-    // look up PTE by referencing UVPT
+    // look up PTE by referencing uvpt
     pte_t pte = uvpt[(uint64_t)addr / PGSIZE];
     // check if CoW page
     if (!(pte & PTE_COW))
@@ -33,7 +32,7 @@ pgfault(struct UTrapframe *utf)
     // TODO: check if write
     if (0)
         panic("pgfault is not a write\n");
-
+    
     // Allocate a new page, map it at a temporary location (PFTEMP),
     // copy the data from the old page to the new page, then move the new
     // page to the old page's address.
@@ -42,16 +41,19 @@ pgfault(struct UTrapframe *utf)
     //   No need to explicitly delete the old page's mapping.
 
     // LAB 4: Your code here.
-    // allocate new page, perm: PTE_W and PTE_U --> PTE_USER for syscalls
+    // allocate new page, perm: PTE_W and PTE_U
     // use temporary location PFTEMP
-    if (sys_page_alloc(0, (void *)PFTEMP, PTE_USER) < 0)
+    if (sys_page_alloc(0, (void *)PFTEMP, PTE_P | PTE_W | PTE_U) < 0)
         panic("sys_page_alloc failed\n");
     // copy data from old page to new page
     memcpy((void *)PFTEMP, (const void *)(ROUNDDOWN(addr, PGSIZE)), (size_t)PGSIZE);
     // move new page to the old page's address
-    if (sys_page_map(0, (void *)PFTEMP, 0, (void *)ROUNDDOWN(addr, PGSIZE), PTE_USER) < 0)
+    if (sys_page_map(0, (void *)PFTEMP, 0, (void *)ROUNDDOWN(addr, PGSIZE), PTE_P | PTE_W | PTE_U) < 0)
         panic("sys_page_map failed\n");
-    // TODO: remove temporary location with 'third' syscall?
+    
+    // remove temporary location mapping
+    if (sys_page_unmap(0, (void *)PFTEMP) < 0)
+        panic("sys_page_unmap failed\n");
 }
 
 //
@@ -75,15 +77,17 @@ duppage(envid_t envid, unsigned pn)
     // if page is writable or CoW, create mapping as CoW
     if ((pte & PTE_W) || (pte & PTE_COW)) {
         // unset writable and set as CoW only;
-        pte = pte & (~PTE_W);
-        pte = pte | PTE_COW;
-        // remap current environment's page as new PTE as well
-        if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), 0, (void *)(uint64_t)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
+        // remap page but unset writable and set CoW only
+        if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), envid, (void *)(uint64_t)(pn * PGSIZE), PTE_P | PTE_U | PTE_COW) < 0)
             panic("sys_page_map failed\n");
+        // remap current environment's page as new PTE as well
+        if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), 0, (void *)(uint64_t)(pn * PGSIZE), PTE_P | PTE_U | PTE_COW) < 0)
+            panic("sys_page_map failed\n");
+        return 0;
     }
     // map as PTE
-    if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), envid, (void *)(uint64_t)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
-        panic ("sys__page_map failed\n");
+    if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), envid, (void *)(uint64_t)(pn * PGSIZE), (int)(pte & (PTE_P | PTE_W | PTE_U))) < 0)
+        panic("sys_page_map failed\n");
 
     return 0;
 }
@@ -109,6 +113,7 @@ fork(void)
 {
     // LAB 4: Your code here.
     envid_t env;
+    extern void _pgfault_upcall();
     
     // 1. set pgfault as C-level page fault handler, using set_pgfault_handler
     set_pgfault_handler(pgfault);
@@ -125,29 +130,26 @@ fork(void)
         // parent
         // 3. - (a) for each writable or CoW pages in address below UTOP, call duppage
         // TODO: check order issue described in document
-        // TODO: fork() also needs to handle pages that are present, but not writable or copy-on-write
-        // jchung: but duppage handles other cases so maybe this is okay
-        for (uint64_t va = (uint64_t)(USTACKTOP - PGSIZE); va >= (uint64_t)UTEXT; va -= PGSIZE) {
-            // scan all pages, and skip to next if no mapping exists, instead of traversing deeper
-            // using variables and functions from inc/memlayout.h and inc/mmu.h
-            if (uvpml4e[VPML4E(va)] & PTE_P) {
-                if (uvpde[VPDPE(va)] & PTE_P) {
-                    if (uvpd[VPD(va)] & PTE_P) {
-                        if (uvpt[VPN(va)] & PTE_P)
-                            duppage(env, (unsigned)(VPN(va)));
-                        else
-                            va -= (1 << PTXSHIFT); // -= 4KB, not present in uvpt
-                    } else
-                        va -= (1 << PDXSHIFT); // -= 2MB, not present in uvpd
-                } else
-                    va -= (1 << PDPESHIFT); // -= 1GB, not present in uvpde
+        for (uint64_t va = (uint64_t)0; va < UTOP;) {
+            if (uvpde[VPDPE(va)] & PTE_P) {
+                if (uvpd[VPD(va)] & PTE_P) {
+                    uint64_t stop = va + (1 << PDXSHIFT);
+                    for (; va < stop; va += PGSIZE) {
+                        if (((uvpt[VPN(va)] & (PTE_P | PTE_U)) != (PTE_P | PTE_U)))
+                            continue;
+                        duppage(env, (unsigned)VPN(va));
+                    }
+                }
+                va += (1 << PDXSHIFT);
+            } else {
+                va += (1 << PDPESHIFT);
             }
         }
         // 3. - (b) allocate fresh page in child for exception stack
-        if (sys_page_alloc(env, (void *)(USTACKTOP - PGSIZE), PTE_USER) < 0)
+        if (sys_page_alloc(env, (void *)(UXSTACKTOP - PGSIZE), PTE_P | PTE_W | PTE_U) < 0)
             panic("sys_page_alloc failed\n");
         // 4. sets user page fault entrypoint for child
-        if (sys_env_set_pgfault_upcall(env, thisenv->env_pgfault_upcall) < 0)
+        if (sys_env_set_pgfault_upcall(env, _pgfault_upcall) < 0)
             panic("sys_env_set_pgfault_upcall failed\n");
         // 5. mark child as runnable
         if (sys_env_set_status(env, ENV_RUNNABLE) < 0)
