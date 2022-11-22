@@ -135,7 +135,8 @@ fork(void)
                 if (uvpd[VPD(va)] & PTE_P) {
                     uint64_t stop = va + (1 << PDXSHIFT);
                     for (; va < stop; va += PGSIZE) {
-                        if (((uvpt[VPN(va)] & (PTE_P | PTE_U)) != (PTE_P | PTE_U)))
+                        //if (((uvpt[VPN(va)] & (PTE_P | PTE_U)) != (PTE_P | PTE_U)))
+                        if (((uvpt[VPN(va)] & (PTE_P | PTE_U)) != (PTE_P | PTE_U)) || (VPN(va) == PPN(UXSTACKTOP) - 1))
                             continue;
                         duppage(env, (unsigned)VPN(va));
                     }
