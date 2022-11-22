@@ -298,6 +298,15 @@ trap_dispatch(struct Trapframe *tf)
                                       tf->tf_regs.reg_rdi,
                                       tf->tf_regs.reg_rsi);
         break;
+    // Lab 4 Exercise 14
+    case (IRQ_OFFSET + IRQ_SPURIOUS):
+        panic("should not have reached here\n");
+        break;
+    case (IRQ_OFFSET + IRQ_TIMER):
+        // acknowledge interrupt using lapic_eoi before calling scheduler
+        lapic_eoi();
+        sched_yield();
+        break;
     default:
         // Unexpected trap: The user process or the kernel has a bug.
 	    print_trapframe(tf);
