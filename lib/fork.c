@@ -78,11 +78,11 @@ duppage(envid_t envid, unsigned pn)
         pte = pte & (~PTE_W);
         pte = pte | PTE_COW;
         // remap current environment's page as new PTE as well
-        if (sys_page_map(0, (void *)(pn * PGSIZE), 0, (void *)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
+        if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), 0, (void *)(uint64_t)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
             panic("sys_page_map failed\n");
     }
     // map as PTE
-    if (sys_page_map(0, (void *)(pn * PGSIZE), envid, (void *)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
+    if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), envid, (void *)(uint64_t)(pn * PGSIZE), (int)(pte & PTE_USER)) < 0)
         panic ("sys__page_map failed\n");
 
     return 0;
@@ -108,7 +108,53 @@ envid_t
 fork(void)
 {
     // LAB 4: Your code here.
-    panic("fork not implemented");
+    envid_t env;
+    
+    // 1. set pgfault as C-level page fault handler, using set_pgfault_handler
+    set_pgfault_handler(pgfault);
+    
+    // 2. parent calls sys_exofork to create child environment
+    env = sys_exofork();
+    if (env < 0)
+        panic("sys_exofork failed\n");
+    if (env == 0) {
+        // child
+        // 'remember to fix thisenv in the child process'
+        thisenv = &(envs[ENVX(sys_getenvid())]);
+    } else {
+        // parent
+        // 3. - (a) for each writable or CoW pages in address below UTOP, call duppage
+        // TODO: check order issue described in document
+        // TODO: fork() also needs to handle pages that are present, but not writable or copy-on-write
+        // jchung: but duppage handles other cases so maybe this is okay
+        for (uint64_t va = (uint64_t)(USTACKTOP - PGSIZE); va >= (uint64_t)UTEXT; va -= PGSIZE) {
+            // scan all pages, and skip to next if no mapping exists, instead of traversing deeper
+            // using variables and functions from inc/memlayout.h and inc/mmu.h
+            if (uvpml4e[VPML4E(va)] & PTE_P) {
+                if (uvpde[VPDPE(va)] & PTE_P) {
+                    if (uvpd[VPD(va)] & PTE_P) {
+                        if (uvpt[VPN(va)] & PTE_P)
+                            duppage(env, (unsigned)(VPN(va)));
+                        else
+                            va -= (1 << PTXSHIFT); // -= 4KB, not present in uvpt
+                    } else
+                        va -= (1 << PDXSHIFT); // -= 2MB, not present in uvpd
+                } else
+                    va -= (1 << PDPESHIFT); // -= 1GB, not present in uvpde
+            }
+        }
+        // 3. - (b) allocate fresh page in child for exception stack
+        if (sys_page_alloc(env, (void *)(USTACKTOP - PGSIZE), PTE_USER) < 0)
+            panic("sys_page_alloc failed\n");
+        // 4. sets user page fault entrypoint for child
+        if (sys_env_set_pgfault_upcall(env, thisenv->env_pgfault_upcall) < 0)
+            panic("sys_env_set_pgfault_upcall failed\n");
+        // 5. mark child as runnable
+        if (sys_env_set_status(env, ENV_RUNNABLE) < 0)
+            panic("sys_env_set_status failed\n");
+    }
+    // 0 for child, positive for parent
+    return env;
 }
 
 // Challenge!
