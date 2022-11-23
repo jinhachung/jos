@@ -28,22 +28,26 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
     // if pg is NULL, pass value that sys_ipc_recv will do nothing about --> UTOP
     if(!pg)
         pg = (void*) UTOP;
-
+    /*
     if (!from_env_store)
         panic("from_env_store is NULL\n");
     if (!perm_store)
         panic("perm_store is NULL\n");
-
+    */
     errno = sys_ipc_recv(pg);
     if (errno < 0) {
         // set to 0 and return error
-        *from_env_store = 0;
-        *perm_store =0;
+        if (from_env_store)
+            *from_env_store = 0;
+        if (perm_store)
+            *perm_store =0;
         return errno;
     }
     // store values and return value
-    *from_env_store = thisenv->env_ipc_from;
-    *perm_store = thisenv->env_ipc_perm;
+    if (from_env_store)
+        *from_env_store = thisenv->env_ipc_from;
+    if (perm_store)
+        *perm_store = thisenv->env_ipc_perm;
     return thisenv->env_ipc_value;
 }
 
@@ -63,11 +67,13 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
     // if pg is NULL, pass value that sys_ipc_recv will do nothing about --> UTOP
     if(!pg)
         pg = (void*)UTOP;
+
     while (1) {
         errno = sys_ipc_try_send(to_env, (uint64_t)val, pg, perm);
         if (errno < 0) {
             if (errno != -E_IPC_NOT_RECV)
                 panic("sys_ipc_try_send returns error other than -E_IPC_NOT_RECV\n");
+            // sys_yield upon error to be CPU-friendly
             if (errno == -E_IPC_NOT_RECV)
                 sys_yield();
         } else
