@@ -421,15 +421,13 @@ sys_ipc_recv(void *dstva)
     curenv->env_ipc_recving = true;
     curenv->env_ipc_dstva = dstva;
     curenv->env_status = ENV_NOT_RUNNABLE;
-    // TODO: how will system call eventuall return 0 on success?
+    // syscall keeps returning positive value (12)
+    // jchung: --> set %rax before returning?
+    curenv->env_tf.tf_regs.reg_rax = 0;
     // give up CPU
     sched_yield();
     return 0;
 }
-
-
-
-
 
 // Dispatches to the correct kernel function, passing the arguments.
 int64_t
