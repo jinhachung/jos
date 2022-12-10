@@ -217,7 +217,25 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	// so filling in ret will overwrite req.
 	//
 	// LAB 5: Your code here
-	panic("serve_read not implemented");
+    // copy what other functions here do...
+    struct OpenFile *o;
+    int err;
+    uint32_t size;
+
+    // look up file ID
+    err = openfile_lookup(envid, req->req_fileid, &o);
+    if (err < 0)
+        return err;
+    
+    // read file
+    // be careful if req->req_n > PGSIZE
+    size = (req->req_n > PGSIZE) ? PGSIZE : req->req_n;
+    err = file_read(o->o_file, ret->ret_buf, size, o->o_fd->fd_offset);
+    if (err < 0)
+        return err;
+
+    o->o_fd->fd_offset += err;
+    return err;
 }
 
 
