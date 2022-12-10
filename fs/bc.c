@@ -48,13 +48,15 @@ bc_pgfault(struct UTrapframe *utf)
 	// Hint: first round addr to page boundary.
 	//
 	// LAB 5: your code here:
+    addr = ROUNDDOWN(addr, BLKSIZE);
+    // allocate page in the disk map region
+    if (sys_page_alloc(0, addr, PTE_P | PTE_W | PTE_U) < 0)
+        panic("sys_page_alloc failed\n");
+    // read contents of block from disk into page
+    ide_read(blockno * BLKSECTS, addr, BLKSECTS);
+    // my code ends here
 
-
-
-	// LAB 5: Your code here
-
-
-	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0)
+    if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0)
 		panic("in bc_pgfault, sys_page_map: %e", r);
 
 	// Check that the block we read was allocated. (exercise for
@@ -80,7 +82,17 @@ flush_block(void *addr)
 		panic("flush_block of bad va %08x", addr);
 
 	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+    addr = ROUNDDOWN(addr, BLKSIZE);
+    if (!va_is_mapped(addr) || !va_is_dirty(addr))
+        return;
+    // mapped and dirty (--> requires flushing)
+    if (ide_write(blockno * BLKSECTS, (const void *)addr, BLKSECTS) < 0)
+        panic("ide_write failed\n");
+    // clear PTE_D bit using sys_page_map
+    // jchung: sys_page_map just copied the one already implemented in bc_pgfault.
+    //         check its arguments if something needs debugging
+    if (sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL) < 0)
+        panic("sys_page_map failed\n");
 }
 
 // Test that the block cache works, by smashing the superblock and
