@@ -123,11 +123,20 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+    for (int i = NENV - 1; i >= 0; --i) {
+        envs[i].env_id = 0;
+        // make env_link traversal become: 0 -> 1 -> 2 -> ...
+        if (i == NENV - 1)
+            envs[i].env_link = NULL;
+        else
+            envs[i].env_link = &envs[i + 1];
+    }
+    // make free list point to all envs
+    env_free_list = envs;
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
-
 // Load GDT and segment descriptors.
 void
 env_init_percpu(void)
@@ -189,6 +198,17 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+    // you need to increment env_pml4e's pp_ref for env_free to work correctly
+    p->pp_ref++;
+    // set e->env_pml4e, should be KVA
+    e->env_pml4e = (pml4e_t *)page2kva(p);
+    // jchung: I think e->env_cr3 should also be set but do only what I am told to for now
+    e->env_cr3 = page2pa(p);
+    // initialize page directory - everything above UTOP needs to be mapped into every environment's virtual space:
+    // "simple copying of this entry from kernel's pml4 to the environment's pml4"
+    for (int i = PML4(UTOP); i < NPMLENTRIES; ++i) {
+        e->env_pml4e[i] = boot_pml4e[i];
+    }
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -196,7 +216,6 @@ env_setup_vm(struct Env *e)
 
 	return 0;
 }
-
 
 //
 // Allocates and initializes a new environment.
@@ -255,6 +274,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
+    e->env_tf.tf_eflags = FL_IF;
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -287,6 +307,19 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+    uint64_t start = ROUNDDOWN((uint64_t)va, PGSIZE);
+    uint64_t end = ROUNDUP((uint64_t)(va + len), PGSIZE);
+    for (uint64_t vaddr = start; vaddr < end; vaddr += PGSIZE) {
+        struct PageInfo *page = page_alloc(ALLOC_ZERO);
+        // 'panic if any allocation attempt fails'
+        if (!page)
+            panic("region_alloc: out of free pages\n");
+        // map physical page to VA vaddr
+        // usage: page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
+        // perm - 'pages should be writable by user and kernel'
+        page_insert(e->env_pml4e, page, (void *)vaddr, PTE_W | PTE_U);
+        //page_insert(e->env_pml4e, page, (void *)vaddr, PTE_USER);
+    }
 }
 
 //
@@ -341,13 +374,46 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  You must also do something with the program's entry point,
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
+    // jchung: --> answer: lcr3() to load CR3
 
 	// LAB 3: Your code here
+    struct Proghdr *ph, *eph;
+    struct Elf *elf = (struct Elf *)binary;
+    // 'you must also do something with the program's entry point,
+    // to make sure that the environment starts executing there'
+    lcr3(e->env_cr3);
+    // 'load_icode panics if it encounters problems'
+    if (elf->e_magic != ELF_MAGIC)
+        panic("load_icode: invalid ELF magic number\n");
+    
+    // set and traverse ELF as was done at boot/main.c:bootmain()
+    ph = (struct Proghdr *)((uint8_t *)binary + elf->e_phoff);
+    eph = ph + elf->e_phnum;
+	//e->elf = binary;
+    for (; ph < eph; ++ph) {
+        // 'you should only load segments with ph->p_type == ELF_PROG_LOAD'
+        // 'the ELF header should have ph->p_filesz <= ph->p_memsz'
+        if ((ph->p_type != ELF_PROG_LOAD) || (ph->p_filesz > ph->p_memsz))
+            continue;
+        // 'load each program segment into virtual memory
+        // at the address specified in the ELF section header'
+        region_alloc(e, (void *)(ph->p_va), ph->p_memsz);
+        // 'the ph->p_filesz bytes from the ELF binary,
+        // starting at binary + ph->p_offset, should be copied to virtual address ph->p_va'
+        memcpy((void *)(ph->p_va), binary + ph->p_offset, ph->p_filesz);
+        // 'any remaining memory bytes should be cleared to zero'
+        memset((void *)(ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+    }
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
 	// LAB 3: Your code here.
+    region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
 	e->elf = binary;
+    // jchung: should set USTACKTOP as initial stack pointer for environment
+    e->env_tf.tf_rsp = USTACKTOP;
+    e->env_tf.tf_rip = elf->e_entry;
+    // TODO: done?
 }
 
 //
@@ -361,6 +427,13 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+    struct Env *e;
+    // 'new env's parent ID is set to 0'
+    int ret = env_alloc(&e, 0);
+    if (ret)
+        panic("env_create: failed env_alloc with %e\n", ret);
+    load_icode(e, binary);
+    e->env_type = type;
 
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
@@ -463,7 +536,6 @@ env_destroy(struct Env *e)
 	}
 }
 
-
 //
 // Restores the register values in the Trapframe with the 'iret' instruction.
 // This exits the kernel and starts executing some environment's code.
@@ -513,7 +585,22 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
-	panic("env_run not yet implemented");
+    // 'set current environment (if any) back to ENV_RUNNABLE if it is ENV_RUNNING
+    if ((curenv) && (curenv->env_status == ENV_RUNNING))
+        curenv->env_status = ENV_RUNNABLE;
+    // 'set curenv to the new environment'
+    curenv = e;
+    // 'set its status to ENV_RUNNING'
+    curenv->env_status = ENV_RUNNING;
+    // 'update its env_runs counter'
+    curenv->env_runs++;
+    // jchung: loading CR3 means switching back to user mode --> unlock here (lab4)
+    unlock_kernel();
+    // 'use lcr3() to switch to its address space'
+    lcr3(curenv->env_cr3);
+    //unlock_kernel();
+    // 'use env_pop_tf() to restore the environment's registers
+    // and drop into user mode in the environment'
+    env_pop_tf(&curenv->env_tf);
 }
 

@@ -67,18 +67,31 @@ call *%rax
 // ways as registers become unavailable as scratch space.
 //
 // LAB 4: Your code here.
+// jchung: get trapframe's rip and rsp into rbx and rcx, respectively
+// but push rip value to stack (subtract rsp by 8) 
+subq $8, 152(%rsp)
+movq 136(%rsp), %rbx
+movq 152(%rsp), %rcx
+movq %rbx, (%rcx)
 
-    // Restore the trap-time registers.  After you do this, you
-    // can no longer modify any general-purpose registers.
-    // LAB 4: Your code here.
+// Restore the trap-time registers.  After you do this, you
+// can no longer modify any general-purpose registers.
+// LAB 4: Your code here.
+addq $16, %rsp
+POPA_
 
-    // Restore eflags from the stack.  After you do this, you can
-    // no longer use arithmetic operations or anything else that
-    // modifies eflags.
-    // LAB 4: Your code here.
+// Restore eflags from the stack.  After you do this, you can
+// no longer use arithmetic operations or anything else that
+// modifies eflags.
+// LAB 4: Your code here.
+// TODO: is popfq the right instruction? referred to: https://www.felixcloutier.com/x86/popf:popfd:popfq
+addq $8, %rsp
+popfq
 
-    // Switch back to the adjusted trap-time stack.
-    // LAB 4: Your code here.
+// Switch back to the adjusted trap-time stack.
+// LAB 4: Your code here.
+popq %rsp
 
-    // Return to re-execute the instruction that faulted.
-    // LAB 4: Your code here.
+// Return to re-execute the instruction that faulted.
+// LAB 4: Your code here.
+ret
