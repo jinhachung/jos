@@ -71,28 +71,28 @@ open(const char *path, int mode)
 
     // LAB 5: Your code here
     int err;
-	struct Fd *fd;
+    struct Fd *fd;
 
     // path is too long
-	if (strlen(path) >= MAXPATHLEN)
-		return -E_BAD_PATH;
+    if (strlen(path) >= MAXPATHLEN)
+        return -E_BAD_PATH;
 
     // find unused file descriptor page using fd_alloc
-	err = fd_alloc(&fd);
+    err = fd_alloc(&fd);
     if (err < 0)
-		return err;
+        return err;
 
-	strcpy(fsipcbuf.open.req_path, path);
-	fsipcbuf.open.req_omode = mode;
+    strcpy(fsipcbuf.open.req_path, path);
+    fsipcbuf.open.req_omode = mode;
 
-	err = fsipc(FSREQ_OPEN, fd);
+    err = fsipc(FSREQ_OPEN, fd);
     if (err < 0) {
-		fd_close(fd, 0);
-		return err;
-	}
+        fd_close(fd, 0);
+        return err;
+    }
 
     // return descriptor index on success
-	return fd2num(fd);
+    return fd2num(fd);
 }
 
 // Flush the file descriptor.  After this the fileid is invalid.
@@ -147,12 +147,12 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
     // remember that write is always allowed to write *fewer*
     // bytes than requested.
     // LAB 5: Your code here
-	n = (n > sizeof(fsipcbuf.write.req_buf)) ? sizeof(fsipcbuf.write.req_buf) : n;
-	fsipcbuf.write.req_fileid = fd->fd_file.id;
-	fsipcbuf.write.req_n = n;
-	memcpy(fsipcbuf.write.req_buf, buf, n);
+    n = (n > sizeof(fsipcbuf.write.req_buf)) ? sizeof(fsipcbuf.write.req_buf) : n;
+    fsipcbuf.write.req_fileid = fd->fd_file.id;
+    fsipcbuf.write.req_n = n;
+    memcpy(fsipcbuf.write.req_buf, buf, n);
 
-	return fsipc(FSREQ_WRITE, NULL);
+    return fsipc(FSREQ_WRITE, NULL);
 }
 
 static int
