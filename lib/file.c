@@ -70,6 +70,29 @@ open(const char *path, int mode)
     // file descriptor.
 
     // LAB 5: Your code here
+    int err;
+	struct Fd *fd;
+
+    // path is too long
+	if (strlen(path) >= MAXPATHLEN)
+		return -E_BAD_PATH;
+
+    // find unused file descriptor page using fd_alloc
+	err = fd_alloc(&fd);
+    if (err < 0)
+		return err;
+
+	strcpy(fsipcbuf.open.req_path, path);
+	fsipcbuf.open.req_omode = mode;
+
+	err = fsipc(FSREQ_OPEN, fd);
+    if (err < 0) {
+		fd_close(fd, 0);
+		return err;
+	}
+
+    // return descriptor index on success
+	return fd2num(fd);
 }
 
 // Flush the file descriptor.  After this the fileid is invalid.
