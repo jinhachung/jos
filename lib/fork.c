@@ -74,6 +74,14 @@ duppage(envid_t envid, unsigned pn)
 
     // LAB 4: Your code here.
     pte_t pte = uvpt[pn];
+
+    // jchung: lab 5 - if PTE has PTE_SHARE set, just copy mapping directly
+    if (pte & PTE_SHARE) {
+        if (sys_page_map(0, (void *)(uint64_t)(pn * PGSIZE), envid, (void *)(uint64_t)(pn * PGSIZE), PTE_SYSCALL) < 0)
+            panic("sys_page_map_failed\n");
+        return 0;
+    }
+
     // if page is writable or CoW, create mapping as CoW
     if ((pte & PTE_W) || (pte & PTE_COW)) {
         // unset writable and set as CoW only;
